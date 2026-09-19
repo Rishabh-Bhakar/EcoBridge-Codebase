@@ -1,6 +1,26 @@
+# Python
 .env
 venv/
 backend/venv/
 __pycache__/
 *.pyc
+
+# Node
 node_modules/
+
+# Test/generated files
+*.pdf
+*.wav
+*.backup
+*_backup.py
+*_backup.jsx
+*_backup_before_*.py
+*_backup_before_*.jsx
+
+# Test images
+backend/*_test.png
+backend/*_result.png
+
+# Test scripts
+backend/test_*.py
+backend/tts_test.py
