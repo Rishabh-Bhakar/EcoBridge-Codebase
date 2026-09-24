@@ -246,3 +246,93 @@ export function getAuthHeaders() {
     Authorization: `Bearer ${token}`,
   };
 }
+// ============================================================
+// LESSONS
+// ============================================================
+
+export async function createLesson(lessonData) {
+  const response = await fetch(`${API_URL}/api/lessons`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(lessonData),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.detail || "Failed to create lesson."
+    );
+  }
+
+  return data;
+}
+
+
+export async function getLessons() {
+  const response = await fetch(`${API_URL}/api/lessons`, {
+    method: "GET",
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.detail || "Failed to fetch lessons."
+    );
+  }
+
+  return data;
+}
+
+
+export async function publishLesson(lessonId) {
+  const response = await fetch(
+    `${API_URL}/api/lessons/${lessonId}/publish`,
+    {
+      method: "PUT",
+      headers: {
+        ...getAuthHeaders(),
+      },
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.detail || "Failed to publish lesson."
+    );
+  }
+
+  return data;
+}
+
+
+export async function deleteLesson(lessonId) {
+  const response = await fetch(
+    `${API_URL}/api/lessons/${lessonId}`,
+    {
+      method: "DELETE",
+      headers: {
+        ...getAuthHeaders(),
+      },
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.detail || "Failed to delete lesson."
+    );
+  }
+
+  return data;
+}

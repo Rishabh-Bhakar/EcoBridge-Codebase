@@ -1,7 +1,16 @@
 import os
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    DateTime,
+    Boolean,
+    ForeignKey,
+    Text,
+)
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql import func
 
@@ -56,6 +65,63 @@ class User(Base):
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
+        nullable=False,
+    )
+class Lesson(Base):
+    __tablename__ = "lessons"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    teacher_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    type = Column(
+        String(20),
+        nullable=False,
+    )
+
+    source_language = Column(
+        String(50),
+        nullable=False,
+    )
+
+    input = Column(
+        Text,
+        nullable=False,
+    )
+
+    translation = Column(
+        Text,
+        nullable=False,
+    )
+
+    target_language = Column(
+        String(50),
+        nullable=False,
+    )
+
+    target_script = Column(
+        String(50),
+        nullable=False,
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    published = Column(
+        Boolean,
+        default=False,
         nullable=False,
     )
 

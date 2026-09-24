@@ -4,6 +4,7 @@ import {
   translateText,
   speechToText,
   translatePdf,
+  createLesson,
 } from "../services/api";
 
 
@@ -426,93 +427,48 @@ function Translator() {
   // SAVE TEXT LESSON
   // ==========================================================
 
-  function saveLesson() {
+async function saveLesson() {
+  if (
+    !hindiText.trim() ||
+    !translation.trim()
+  ) {
+    setError(
+      "Translate some content before saving."
+    );
 
-    if (
-      !hindiText.trim() ||
-      !translation.trim()
-    ) {
-
-      setError(
-        "Translate some content before saving."
-      );
-
-      return;
-    }
-
-
-    try {
-
-      const existing =
-        JSON.parse(
-          localStorage.getItem(
-            "echobridge_lessons"
-          ) || "[]"
-        );
-
-
-      const lesson = {
-
-        id: Date.now(),
-
-        type:
-          "text",
-
-        sourceLanguage:
-          sourceLanguage,
-
-        input:
-          hindiText,
-
-        translation:
-          translation,
-
-        targetLanguage:
-          "Santali",
-
-        targetScript:
-          "Ol Chiki",
-
-        createdAt:
-          new Date().toISOString(),
-
-        published:
-          false,
-      };
-
-
-      existing.push(
-        lesson
-      );
-
-
-      localStorage.setItem(
-        "echobridge_lessons",
-        JSON.stringify(existing)
-      );
-
-
-      setSaved(true);
-      setError("");
-
-
-    }
-
-    catch (err) {
-
-      console.error(
-        "Save lesson error:",
-        err
-      );
-
-      setError(
-        "Could not save lesson."
-      );
-    }
+    return;
   }
 
+  try {
+    const result = await createLesson({
+      type: "text",
+      source_language: sourceLanguage,
+      input: hindiText,
+      translation: translation,
+      target_language: "Santali",
+      target_script: "Ol Chiki",
+      published: false,
+    });
 
-  // ==========================================================
+    setSaved(true);
+    setError("");
+
+    console.log(
+      "Lesson saved successfully:",
+      result.lesson
+    );
+  } catch (err) {
+    console.error(
+      "Save lesson error:",
+      err
+    );
+
+    setError(
+      err.message ||
+        "Could not save lesson."
+    );
+  }
+}  // ==========================================================
   // PDF SELECT
   // ==========================================================
 
@@ -736,60 +692,18 @@ function Translator() {
 
 
       // ------------------------------------------------------
-      // Save lesson metadata
+      // Save lesson metadata to PostgreSQL
       // ------------------------------------------------------
 
-      const existing =
-        JSON.parse(
-          localStorage.getItem(
-            "echobridge_lessons"
-          ) || "[]"
-        );
-
-
-      const lesson = {
-
-        id:
-          lessonId,
-
-        type:
-          "pdf",
-
-        sourceLanguage:
-          "english",
-
-        input:
-          pdfFileName,
-
-        translation:
-          "Santali PDF lesson",
-
-        targetLanguage:
-          "Santali",
-
-        targetScript:
-          "Ol Chiki",
-
-        pdfStored:
-          true,
-
-        createdAt:
-          new Date().toISOString(),
-
-        published:
-          true,
-      };
-
-
-      existing.push(
-        lesson
-      );
-
-
-      localStorage.setItem(
-        "echobridge_lessons",
-        JSON.stringify(existing)
-      );
+      await createLesson({
+        type: "pdf",
+        source_language: "English",
+        input: pdfFileName,
+        translation: "Santali PDF lesson",
+        target_language: "Santali",
+        target_script: "Ol Chiki",
+        published: true,
+      });
 
 
       setPdfPublished(true);
@@ -1223,6 +1137,7 @@ function Translator() {
             <h2
               style={{
                 margin: "0 0 8px",
+	        color: "#111827",
               }}
             >
               English PDF → Santali

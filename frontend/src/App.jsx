@@ -14,17 +14,35 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 
 function App() {
-  // Authentication flow
-  const [authPage, setAuthPage] = useState("welcome");
-  const [selectedRole, setSelectedRole] = useState(null);
+ // Restore previously authenticated user from localStorage.
+// This allows the PWA to reopen without requiring login again.
+const storedUser = localStorage.getItem("echobridge_user");
 
-  // Existing application pages
-  const [page, setPage] = useState("dashboard");
+let initialUser = null;
 
-  // Temporary user state.
-  // PostgreSQL authentication will replace this later.
-  const [user, setUser] = useState(null);
+try {
+  initialUser = storedUser ? JSON.parse(storedUser) : null;
+} catch {
+  initialUser = null;
+}
 
+// Authentication flow
+const [authPage, setAuthPage] = useState(
+  initialUser ? null : "welcome"
+);
+
+const [selectedRole, setSelectedRole] = useState(
+  initialUser?.role || null
+);
+
+// Existing application pages
+const [page, setPage] = useState(
+  initialUser?.role === "student"
+    ? "student"
+    : "dashboard"
+);
+// Restored user state
+const [user, setUser] = useState(initialUser);
   // --------------------------------------------------
   // WELCOME
   // --------------------------------------------------
@@ -168,13 +186,15 @@ function App() {
 
           <button
             style={styles.logoutButton}
-            onClick={() => {
-              setUser(null);
-              setSelectedRole(null);
-              setAuthPage("welcome");
-              setPage("dashboard");
-            }}
-          >
+           onClick={() => {
+  localStorage.removeItem("echobridge_access_token");
+  localStorage.removeItem("echobridge_user");
+
+  setUser(null);
+  setSelectedRole(null);
+  setAuthPage("welcome");
+  setPage("dashboard");
+}}          >
             Logout
           </button>
 
@@ -386,17 +406,17 @@ const styles = {
   },
 
   subNav: {
-    minHeight: "58px",
-    padding: "0 30px",
-    display: "flex",
-    alignItems: "center",
-    gap: "7px",
-    background: "#f8fafc",
-    borderBottom: "1px solid #e5e7eb",
-    flexWrap: "wrap",
-  },
-
-  navButton: {
+  minHeight: "58px",
+  padding: "0 30px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "7px",
+  background: "#f8fafc",
+  borderBottom: "1px solid #e5e7eb",
+  flexWrap: "wrap",
+},
+    navButton: {
     border: "none",
     background: "transparent",
     padding: "9px 13px",

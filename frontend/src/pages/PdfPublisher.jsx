@@ -79,21 +79,6 @@ function PdfPublisher() {
       return;
     }
 
-    const lesson = {
-      title: file
-        ? file.name.replace(/\.pdf$/i, "")
-        : "Santali Lesson",
-      language: "Santali",
-      script: "Ol Chiki",
-      originalFile: file?.name || "",
-      publishedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem(
-      "echobridge_published_lesson",
-      JSON.stringify(lesson)
-    );
-
     setPublished(true);
 
     setStatus(

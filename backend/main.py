@@ -21,15 +21,16 @@ from fastapi import (
     File,
     WebSocket,
     WebSocketDisconnect,
+    Depends,
+    Header,
 )
 from live_translation import live_translation_websocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from fastapi import Depends
 
-from database import User, get_db
+from database import User, Lesson, get_db
 from auth import (
     register_user,
     login_user,
@@ -174,17 +175,16 @@ def load_model(model_name):
     print("=" * 60)
 
     tokenizer = AutoTokenizer.from_pretrained(
-
         model_name,
-
-        trust_remote_code=True
+        trust_remote_code=True,
+        token=os.getenv("HF_TOKEN")
     )
-
     model = AutoModelForSeq2SeqLM.from_pretrained(
 
         model_name,
 
         trust_remote_code=True,
+        token=os.getenv("HF_TOKEN"),
 
         torch_dtype=(
 
@@ -428,6 +428,7 @@ app.add_middleware(
         "http://localhost:5173",
 
         "http://localhost:5174",
+        "http://localhost:4173",
     ],
 
     allow_credentials=True,
@@ -2589,3 +2590,227 @@ def login(
             status_code=401,
             detail=str(error),
         )    
+       # ============================================================
+# LESSON AUTHENTICATION
+# ============================================================
+
+def get_current_user(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db),
+):
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header is required.",
+        )
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authorization header.",
+        )
+
+    token = authorization.split(" ", 1)[1]
+
+    try:
+        payload = decode_access_token(token)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=401,
+            detail=str(error),
+        )
+
+    user_id = payload.get("sub")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication token.",
+        )
+
+    user = (
+        db.query(User)
+        .filter(User.id == int(user_id))
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found.",
+        )
+
+    return user 
+# ============================================================
+# LESSON API
+# ============================================================
+
+class LessonCreateRequest(BaseModel):
+    type: str
+    source_language: str
+    input: str
+    translation: str
+    target_language: str
+    target_script: str
+    published: bool = False
+
+
+@app.post("/api/lessons")
+def create_lesson(
+    request: LessonCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "teacher":
+        raise HTTPException(
+            status_code=403,
+            detail="Only teachers can create lessons.",
+        )
+
+    lesson = Lesson(
+        teacher_id=current_user.id,
+        type=request.type,
+        source_language=request.source_language,
+        input=request.input,
+        translation=request.translation,
+        target_language=request.target_language,
+        target_script=request.target_script,
+        published=request.published,
+    )
+
+    db.add(lesson)
+    db.commit()
+    db.refresh(lesson)
+
+    return {
+        "success": True,
+        "lesson": {
+            "id": lesson.id,
+            "teacher_id": lesson.teacher_id,
+            "type": lesson.type,
+            "source_language": lesson.source_language,
+            "input": lesson.input,
+            "translation": lesson.translation,
+            "target_language": lesson.target_language,
+            "target_script": lesson.target_script,
+            "created_at": lesson.created_at,
+            "published": lesson.published,
+        },
+    }
+
+
+@app.get("/api/lessons")
+def get_lessons(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role == "teacher":
+        lessons = (
+            db.query(Lesson)
+            .filter(Lesson.teacher_id == current_user.id)
+            .order_by(Lesson.created_at.desc())
+            .all()
+        )
+    else:
+        lessons = (
+            db.query(Lesson)
+            .filter(Lesson.published == True)
+            .order_by(Lesson.created_at.desc())
+            .all()
+        )
+
+    return {
+        "success": True,
+        "lessons": [
+            {
+                "id": lesson.id,
+                "teacher_id": lesson.teacher_id,
+                "type": lesson.type,
+                "source_language": lesson.source_language,
+                "input": lesson.input,
+                "translation": lesson.translation,
+                "target_language": lesson.target_language,
+                "target_script": lesson.target_script,
+                "created_at": lesson.created_at,
+                "published": lesson.published,
+            }
+            for lesson in lessons
+        ],
+    }
+
+
+@app.put("/api/lessons/{lesson_id}/publish")
+def publish_lesson(
+    lesson_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "teacher":
+        raise HTTPException(
+            status_code=403,
+            detail="Only teachers can publish lessons.",
+        )
+
+    lesson = (
+        db.query(Lesson)
+        .filter(
+            Lesson.id == lesson_id,
+            Lesson.teacher_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not lesson:
+        raise HTTPException(
+            status_code=404,
+            detail="Lesson not found.",
+        )
+
+    lesson.published = True
+
+    db.commit()
+    db.refresh(lesson)
+
+    return {
+        "success": True,
+        "message": "Lesson published successfully.",
+        "lesson_id": lesson.id,
+        "published": lesson.published,
+    }
+
+
+@app.delete("/api/lessons/{lesson_id}")
+def delete_lesson(
+    lesson_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != "teacher":
+        raise HTTPException(
+            status_code=403,
+            detail="Only teachers can delete lessons.",
+        )
+
+    lesson = (
+        db.query(Lesson)
+        .filter(
+            Lesson.id == lesson_id,
+            Lesson.teacher_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not lesson:
+        raise HTTPException(
+            status_code=404,
+            detail="Lesson not found.",
+        )
+
+    db.delete(lesson)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Lesson deleted successfully.",
+    }
+

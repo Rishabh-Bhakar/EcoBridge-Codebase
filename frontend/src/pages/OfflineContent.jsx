@@ -1,4 +1,4 @@
-import { useState } from "react";
+import {useEffect,useState } from "react";
 
 // ============================================================
 // PDF INDEXEDDB
@@ -56,25 +56,117 @@ async function getPdfOffline(id) {
   });
 }
 
+// ============================================================
+// OFFLINE LESSON INDEXEDDB
+// ============================================================
 
+function openLessonDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(
+      "EchoBridgeLessonDatabase",
+      1
+    );
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains("lessons")) {
+        db.createObjectStore("lessons", {
+          keyPath: "id",
+        });
+      }
+    };
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
+}
+
+async function getOfflineLessons() {
+  const db = await openLessonDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      "lessons",
+      "readonly"
+    );
+
+    const request = transaction
+      .objectStore("lessons")
+      .getAll();
+
+    request.onsuccess = () => {
+      db.close();
+      resolve(request.result || []);
+    };
+
+    request.onerror = () => {
+      db.close();
+      reject(request.error);
+    };
+  });
+}
+
+async function deleteLessonOffline(id) {
+  const db = await openLessonDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      "lessons",
+      "readwrite"
+    );
+
+    transaction.objectStore("lessons").delete(id);
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
 // ============================================================
 // COMPONENT
 // ============================================================
 
 function OfflineContent() {
 
-  const [lessons, setLessons] = useState(() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem(
-          "echobridge_downloaded_lessons"
-        ) || "[]"
-      );
-    } catch {
-      return [];
-    }
-  });
+ const [lessons, setLessons] = useState([]);
 
+useEffect(() => {
+  async function loadOfflineLessons() {
+    try {
+      const indexedLessons = await getOfflineLessons();
+
+      if (indexedLessons.length > 0) {
+        setLessons(indexedLessons);
+        return;
+      }
+
+      
+      setLessons([]);
+    } catch (error) {
+      console.error("Could not load offline lessons:", error);
+
+      try {
+       setLessons([]);
+      } catch {
+        setLessons([]);
+      }
+    }
+  }
+
+  loadOfflineLessons();
+}, []);
 
   const [selectedLesson, setSelectedLesson] =
     useState(null);
@@ -92,117 +184,27 @@ function OfflineContent() {
   // REMOVE LESSON
   // ==========================================================
 
-  const removeLesson = (id) => {
-
-    const updatedLessons =
-      lessons.filter(
-        (lesson) =>
-          lesson.id !== id
-      );
-
-
-    localStorage.setItem(
-      "echobridge_downloaded_lessons",
-      JSON.stringify(
-        updatedLessons
-      )
-    );
-
-
-    setLessons(
-      updatedLessons
-    );
-
-
-    if (
-      selectedLesson?.id === id
-    ) {
-      setSelectedLesson(null);
-    }
-
-
-    setMessage(
-      "Lesson removed from offline storage."
-    );
-  };
-
-
-  // ==========================================================
-  // VIEW PDF
-  // ==========================================================
-
-  async function viewPdf(lesson) {
-
-    try {
-
-      setOpeningPdf(true);
-      setMessage(
-        "Opening Santali PDF..."
-      );
-
-
-      const blob =
-        await getPdfOffline(
-          lesson.id
-        );
-
-
-      if (!blob) {
-
-        setMessage(
-          "PDF is not available in offline storage."
-        );
-
-        return;
-      }
-
-
-      const url =
-        URL.createObjectURL(
-          blob
-        );
-
-
-      window.open(
-        url,
-        "_blank",
-        "noopener,noreferrer"
-      );
-
-
-      // Keep URL alive long enough
-      // for the PDF tab to load.
-      setTimeout(() => {
-        URL.revokeObjectURL(
-          url
-        );
-      }, 60000);
-
-
-      setMessage(
-        "Santali PDF opened successfully."
-      );
-
-    } catch (err) {
-
-      console.error(
-        "PDF view error:",
-        err
-      );
-
-
-      setMessage(
-        "Could not open the PDF."
-      );
-
-    } finally {
-
-      setOpeningPdf(false);
-    }
+ const removeLesson = async (id) => {
+  try {
+    await deleteLessonOffline(id);
+  } catch (error) {
+    console.error("Could not remove lesson from IndexedDB:", error);
   }
 
+  const updatedLessons = lessons.filter(
+    (lesson) => lesson.id !== id
+  );
 
-  // ==========================================================
+  
+
+  setLessons(updatedLessons);
+
+  if (selectedLesson?.id === id) {
+    setSelectedLesson(null);
+  }
+
+  setMessage("Lesson removed from offline storage.");
+};  // ==========================================================
   // SELECT TEXT LESSON
   // ==========================================================
 
@@ -304,10 +306,9 @@ function OfflineContent() {
             📥
           </div>
 
-          <h2>
-            No offline lessons yet
-          </h2>
-
+         <h2 style={{ color: "#111827", margin: "14px 0 10px" }}>
+  No offline lessons yet
+</h2>
           <p>
             Go to Student Dashboard and download
             a lesson first.

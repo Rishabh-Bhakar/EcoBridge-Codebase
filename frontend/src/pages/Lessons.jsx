@@ -1,6 +1,9 @@
-import { useState } from "react";
-
-
+import {useEffect , useState } from "react";
+import {
+  getLessons,
+  publishLesson,
+  deleteLesson as deleteLessonFromApi,
+} from "../services/api";
 // ============================================================
 // PDF INDEXEDDB
 // ============================================================
@@ -68,24 +71,67 @@ function Lessons() {
   // LESSON STATE
   // ==========================================================
 
-  const [lessons, setLessons] = useState(() => {
+ const [lessons, setLessons] = useState([]);
 
-    try {
+useEffect(() => {
+  async function loadLessons() {
+    const token = localStorage.getItem(
+      "echobridge_access_token"
+    );
 
-      return JSON.parse(
-        localStorage.getItem(
-          "echobridge_lessons"
-        ) || "[]"
-      );
-
-    } catch {
-
-      return [];
-
+    if (!token) {
+      return;
     }
 
-  });
+    try {
+      const response = await fetch(
+        "http://localhost:8000/api/lessons",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
+      if (!response.ok) {
+        throw new Error(
+          "Could not load lessons."
+        );
+      }
+
+      const data = await response.json();
+
+      const formattedLessons =
+        data.lessons.map((lesson) => ({
+          id: lesson.id,
+          type: lesson.type,
+          sourceLanguage:
+            lesson.source_language,
+          input: lesson.input,
+          translation:
+            lesson.translation,
+          targetLanguage:
+            lesson.target_language,
+          targetScript:
+            lesson.target_script,
+          createdAt:
+            lesson.created_at,
+          published:
+            lesson.published,
+        }));
+
+      setLessons(formattedLessons);
+
+    } catch (error) {
+      console.warn(
+        "Could not load lessons from server. Using offline cache.",
+        error
+      );
+    }
+  }
+
+  loadLessons();
+}, []);
 
   // ==========================================================
   // MESSAGE
@@ -189,139 +235,111 @@ function Lessons() {
   // DELETE LESSON
   // ==========================================================
 
-  const deleteLesson = (id) => {
+ const deleteLesson = async (id) => {
+  try {
+    await deleteLesson(id);
 
-    const updatedLessons =
-      lessons.filter(
-        (lesson) =>
-          lesson.id !== id
-      );
-
-
-    localStorage.setItem(
-      "echobridge_lessons",
-      JSON.stringify(
-        updatedLessons
+    setLessons((currentLessons) =>
+      currentLessons.filter(
+        (lesson) => lesson.id !== id
       )
     );
 
-
-    setLessons(
-      updatedLessons
-    );
-
-
+    setMessage("Lesson deleted successfully.");
+  } catch (error) {
+    console.error("Delete lesson error:", error);
     setMessage(
-      "Lesson deleted successfully."
+      error.message || "Could not delete lesson."
     );
-
-  };
-
-
+  }
+};
   // ==========================================================
   // TOGGLE PUBLISH
   // ==========================================================
 
-  const togglePublish = (id) => {
+ const togglePublish = async (id) => {
+  const lesson = lessons.find(
+    (item) => item.id === id
+  );
 
-    const updatedLessons =
-      lessons.map(
-        (lesson) => {
+  if (!lesson) {
+    return;
+  }
 
-          if (
-            lesson.id === id
-          ) {
+  if (lesson.published) {
+    setMessage(
+      "This lesson is already published."
+    );
+    return;
+  }
 
-            return {
-              ...lesson,
-              published:
-                !lesson.published,
-            };
+  try {
+    await publishLesson(id);
 
-          }
-
-          return lesson;
-
-        }
-      );
-
-
-    localStorage.setItem(
-      "echobridge_lessons",
-      JSON.stringify(
-        updatedLessons
+    setLessons((currentLessons) =>
+      currentLessons.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              published: true,
+            }
+          : item
       )
     );
 
-
-    setLessons(
-      updatedLessons
+    setMessage(
+      "Lesson published to students."
+    );
+  } catch (error) {
+    console.error(
+      "Publish lesson error:",
+      error
     );
 
-
-    const lesson =
-      lessons.find(
-        (item) =>
-          item.id === id
-      );
-
-
-    if (lesson) {
-
-      setMessage(
-        lesson.published
-          ? "Lesson unpublished."
-          : "Lesson published to students."
-      );
-
-    }
-
-  };
-
-
-  // ==========================================================
+    setMessage(
+      error.message ||
+        "Could not publish lesson."
+    );
+  }
+};  // ==========================================================
   // CLEAR ALL
   // ==========================================================
 
-  const clearAllLessons = () => {
+const clearAllLessons = async () => {
+  if (lessons.length === 0) {
+    return;
+  }
 
-    if (
-      lessons.length === 0
-    ) {
+  const confirmed = window.confirm(
+    "Delete all your lessons permanently?"
+  );
 
-      return;
+  if (!confirmed) {
+    return;
+  }
 
+  try {
+    for (const lesson of lessons) {
+      await deleteLessonFromApi(lesson.id);
     }
-
-
-    const confirmed =
-      window.confirm(
-        "Delete all saved lessons?"
-      );
-
-
-    if (!confirmed) {
-
-      return;
-
-    }
-
-
-    localStorage.removeItem(
-      "echobridge_lessons"
-    );
-
 
     setLessons([]);
 
-
     setMessage(
-      "All lessons deleted."
+      "All lessons deleted successfully."
+    );
+  } catch (error) {
+    console.error(
+      "Clear all lessons error:",
+      error
     );
 
-  };
-
-
+    setMessage(
+      error.message ||
+        "Could not delete all lessons."
+    );
+  }
+}; 
   // ==========================================================
   // UI
   // ==========================================================
@@ -775,25 +793,21 @@ function Lessons() {
 
                       {/* PUBLISH */}
 
-                      <button
-                        onClick={() =>
-                          togglePublish(
-                            lesson.id
-                          )
-                        }
-                        style={
-                          published
-                            ? styles.unpublishButton
-                            : styles.publishButton
-                        }
-                      >
-
-                        {published
-                          ? "↩ Unpublish"
-                          : "📢 Publish to Students"}
-
-                      </button>
-
+                     <button
+  onClick={() =>
+    togglePublish(lesson.id)
+  }
+  disabled={published}
+  style={
+    published
+      ? styles.unpublishButton
+      : styles.publishButton
+  }
+>
+  {published
+    ? "✓ Published"
+    : "📢 Publish to Students"}
+</button>
 
                       {/* DELETE */}
 

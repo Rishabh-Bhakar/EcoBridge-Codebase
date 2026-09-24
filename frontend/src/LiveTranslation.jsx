@@ -375,7 +375,7 @@ export default function LiveTranslation() {
           boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
         }}
       >
-        <h1 style={{ marginBottom: "8px" }}>
+        <h1 style={{ marginBottom: "8px",color: "#111827", }}>
           🎙️ Live Translation
         </h1>
 

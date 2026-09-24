@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { getLessons } from "../services/api";
 
 // ============================================================
 // PDF INDEXEDDB
@@ -56,55 +58,299 @@ async function getPdfOffline(id) {
   });
 }
 
+// ============================================================
+// OFFLINE LESSON INDEXEDDB
+// ============================================================
 
+function openLessonDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(
+      "EchoBridgeLessonDatabase",
+      1
+    );
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains("lessons")) {
+        db.createObjectStore("lessons", {
+          keyPath: "id",
+        });
+      }
+    };
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
+}
+
+
+async function saveLessonOffline(lesson) {
+  const db = await openLessonDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      "lessons",
+      "readwrite"
+    );
+
+    transaction.objectStore("lessons").put(
+      lesson
+    );
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
+async function getDownloadedLessons() {
+  const db = await openLessonDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      "lessons",
+      "readonly"
+    );
+
+    const request =
+      transaction.objectStore("lessons").getAll();
+
+    request.onsuccess = () => {
+      db.close();
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      db.close();
+      reject(request.error);
+    };
+  });
+}
 // ============================================================
 // COMPONENT
 // ============================================================
 
 function StudentDashboard() {
 
-  const [lessons, setLessons] = useState(() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem(
-          "echobridge_lessons"
-        ) || "[]"
-      );
-    } catch {
-      return [];
-    }
-  });
+  const [lessons, setLessons] = useState([]);
 
+  const [downloaded, setDownloaded] = useState([]);
 
-  const [downloaded, setDownloaded] =
-    useState(() => {
-      try {
-        return JSON.parse(
-          localStorage.getItem(
-            "echobridge_downloaded_lessons"
-          ) || "[]"
-        );
-      } catch {
-        return [];
-      }
-    });
-
+  const [isOnline, setIsOnline] = useState(
+    navigator.onLine
+  );
 
   const [selectedLesson, setSelectedLesson] =
     useState(null);
 
-
   const [openingPdf, setOpeningPdf] =
     useState(false);
-
 
   const [message, setMessage] =
     useState("");
 
 
-  // ==========================================================
+  // ============================================================
+  // INTERNET CONNECTION STATUS
+  // ============================================================
+
+  useEffect(() => {
+
+    function handleOnline() {
+      setIsOnline(true);
+    }
+
+    function handleOffline() {
+      setIsOnline(false);
+    }
+
+    window.addEventListener(
+      "online",
+      handleOnline
+    );
+
+    window.addEventListener(
+      "offline",
+      handleOffline
+    );
+
+    return () => {
+
+      window.removeEventListener(
+        "online",
+        handleOnline
+      );
+
+      window.removeEventListener(
+        "offline",
+        handleOffline
+      );
+
+    };
+
+  }, []);
+
+
+  // ============================================================
+  // LOAD DOWNLOADED LESSONS FROM INDEXEDDB
+  // ============================================================
+
+  useEffect(() => {
+
+    async function loadDownloadedLessons() {
+
+      try {
+
+        const offlineLessons =
+          await getDownloadedLessons();
+
+        setDownloaded(offlineLessons);
+
+      } catch (error) {
+
+        console.error(
+          "Could not load offline lessons:",
+          error
+        );
+
+      }
+
+    }
+
+    loadDownloadedLessons();
+
+  }, []);
+
+
+  // ============================================================
+  // LOAD LESSONS
+  // ============================================================
+
+  useEffect(() => {
+
+    async function loadLessons() {
+
+      // --------------------------------------------------------
+      // OFFLINE
+      // --------------------------------------------------------
+
+      if (!isOnline) {
+
+        try {
+
+          const offlineLessons =
+            await getDownloadedLessons();
+
+          setLessons(offlineLessons);
+
+        } catch (error) {
+
+          console.error(
+            "Could not load offline lessons:",
+            error
+          );
+
+          setLessons([]);
+
+        }
+
+        return;
+      }
+
+
+      // --------------------------------------------------------
+      // ONLINE
+      // --------------------------------------------------------
+
+      try {
+
+        const data = await getLessons();
+
+        const formattedLessons =
+          data.lessons.map((lesson) => ({
+
+            id: lesson.id,
+
+            type: lesson.type,
+
+            sourceLanguage:
+              lesson.source_language,
+
+            input:
+              lesson.input,
+
+            translation:
+              lesson.translation,
+
+            targetLanguage:
+              lesson.target_language,
+
+            targetScript:
+              lesson.target_script,
+
+            createdAt:
+              lesson.created_at,
+
+            published:
+              lesson.published,
+
+          }));
+
+        setLessons(formattedLessons);
+
+      } catch (error) {
+
+        console.warn(
+          "Could not load lessons from server. Loading downloaded lessons.",
+          error
+        );
+
+
+        // ------------------------------------------------------
+        // API FAILED → OFFLINE FALLBACK
+        // ------------------------------------------------------
+
+        try {
+
+          const offlineLessons =
+            await getDownloadedLessons();
+
+          setLessons(offlineLessons);
+
+        } catch (offlineError) {
+
+          console.error(
+            "Could not load offline lessons:",
+            offlineError
+          );
+
+          setLessons([]);
+
+        }
+
+      }
+
+    }
+
+    loadLessons();
+
+  }, [isOnline]);
+
+
+  // ============================================================
   // PUBLISHED LESSONS
-  // ==========================================================
+  // ============================================================
 
   const publishedLessons =
     lessons.filter(
@@ -113,21 +359,23 @@ function StudentDashboard() {
     );
 
 
-  // ==========================================================
+  // ============================================================
   // DOWNLOADED CHECK
-  // ==========================================================
+  // ============================================================
 
   const isDownloaded = (id) => {
+
     return downloaded.some(
       (lesson) =>
         lesson.id === id
     );
+
   };
 
 
-  // ==========================================================
+  // ============================================================
   // DOWNLOAD LESSON
-  // ==========================================================
+  // ============================================================
 
   async function downloadLesson(lesson) {
 
@@ -137,10 +385,9 @@ function StudentDashboard() {
 
     try {
 
-      // ------------------------------------------------------
-      // PDF is already stored in IndexedDB when published.
-      // We only store its metadata in localStorage here.
-      // ------------------------------------------------------
+      // --------------------------------------------------------
+      // PDF CHECK
+      // --------------------------------------------------------
 
       if (lesson.type === "pdf") {
 
@@ -150,27 +397,37 @@ function StudentDashboard() {
           );
 
         if (!pdfBlob) {
+
           setMessage(
             "PDF is not available in offline storage."
           );
+
           return;
         }
+
       }
 
 
-      const updated = [
-        ...downloaded,
-        lesson,
-      ];
+      // --------------------------------------------------------
+      // SAVE LESSON TO INDEXEDDB
+      // --------------------------------------------------------
 
-
-      localStorage.setItem(
-        "echobridge_downloaded_lessons",
-        JSON.stringify(updated)
+      await saveLessonOffline(
+        lesson
       );
 
 
-      setDownloaded(updated);
+      // --------------------------------------------------------
+      // UPDATE UI
+      // --------------------------------------------------------
+
+      setDownloaded(
+        (current) => [
+          ...current,
+          lesson,
+        ]
+      );
+
 
       setMessage(
         "Lesson is now available offline."
@@ -186,25 +443,32 @@ function StudentDashboard() {
       setMessage(
         "Could not save lesson offline."
       );
+
     }
+
   }
 
 
-  // ==========================================================
+  // ============================================================
   // VIEW PDF
-  // ==========================================================
+  // ============================================================
 
   async function viewPdf(lesson) {
 
-    if (!lesson || lesson.type !== "pdf") {
+    if (
+      !lesson ||
+      lesson.type !== "pdf"
+    ) {
       return;
     }
-
 
     try {
 
       setOpeningPdf(true);
-      setMessage("Opening Santali PDF...");
+
+      setMessage(
+        "Opening Santali PDF..."
+      );
 
 
       const blob =
@@ -236,9 +500,12 @@ function StudentDashboard() {
       );
 
 
-      // Give the browser time to load the PDF
       setTimeout(() => {
-        URL.revokeObjectURL(url);
+
+        URL.revokeObjectURL(
+          url
+        );
+
       }, 60000);
 
 
@@ -260,23 +527,30 @@ function StudentDashboard() {
     } finally {
 
       setOpeningPdf(false);
+
     }
+
   }
 
 
-  // ==========================================================
+  // ============================================================
   // VIEW TEXT LESSON
-  // ==========================================================
+  // ============================================================
 
   function viewTextLesson(lesson) {
-    setSelectedLesson(lesson);
+
+    setSelectedLesson(
+      lesson
+    );
+
     setMessage("");
+
   }
 
 
-  // ==========================================================
+  // ============================================================
   // UI
-  // ==========================================================
+  // ============================================================
 
   return (
     <div style={styles.container}>
@@ -305,8 +579,18 @@ function StudentDashboard() {
         </div>
 
 
-        <div style={styles.offlineBadge}>
-          📱 Offline Learning
+        <div
+          style={
+            isOnline
+              ? styles.onlineBadge
+              : styles.offlineBadge
+          }
+        >
+
+          {isOnline
+            ? "🟢 Connected"
+            : "🔴 Offline"}
+
         </div>
 
       </div>
@@ -317,9 +601,11 @@ function StudentDashboard() {
       {/* ================================================== */}
 
       {message && (
+
         <div style={styles.message}>
           {message}
         </div>
+
       )}
 
 
@@ -399,7 +685,9 @@ function StudentDashboard() {
       {/* ================================================== */}
 
       <h2 style={styles.sectionTitle}>
-        Available Lessons
+        {isOnline
+          ? "Available Lessons"
+          : "Downloaded Lessons"}
       </h2>
 
 
@@ -411,13 +699,22 @@ function StudentDashboard() {
             📚
           </div>
 
-          <h2>
-            No lessons available
-          </h2>
-
+          <h2
+  style={{
+    color: "#111827",
+    margin: "14px 0 10px",
+  }}
+>
+  {isOnline
+    ? "No lessons available"
+    : "No offline lessons"}
+</h2>
           <p>
-            Your teacher has not published any
-            lessons yet.
+
+            {isOnline
+              ? "Your teacher has not published any lessons yet."
+              : "Connect to the internet and download lessons to use them offline."}
+
           </p>
 
         </div>
@@ -484,9 +781,11 @@ function StudentDashboard() {
 
 
                     {isPdf && (
+
                       <span style={styles.pdfBadge}>
                         📄 PDF
                       </span>
+
                     )}
 
                   </div>
@@ -509,17 +808,21 @@ function StudentDashboard() {
                   {/* ORIGINAL */}
 
                   {!isPdf && (
+
                     <p style={styles.original}>
                       {lesson.input}
                     </p>
+
                   )}
 
 
                   {isPdf && (
+
                     <p style={styles.pdfDescription}>
                       Santali educational PDF
                       translated by EchoBridge.
                     </p>
+
                   )}
 
 
@@ -551,9 +854,11 @@ function StudentDashboard() {
                         styles.translation
                       }
                     >
+
                       {isPdf
                         ? "Santali PDF lesson"
                         : lesson.translation}
+
                     </p>
 
                   </div>
@@ -573,10 +878,12 @@ function StudentDashboard() {
                               lesson
                             )
                       }
+
                       disabled={
                         isPdf &&
                         openingPdf
                       }
+
                       style={
                         styles.viewButton
                       }
@@ -591,7 +898,7 @@ function StudentDashboard() {
 
                     {/* DOWNLOAD */}
 
-                    {!saved && (
+                    {!saved && isOnline && (
 
                       <button
                         onClick={() =>
@@ -599,6 +906,7 @@ function StudentDashboard() {
                             lesson
                           )
                         }
+
                         style={
                           styles.downloadButton
                         }
@@ -625,10 +933,13 @@ function StudentDashboard() {
                   </div>
 
                 </div>
+
               );
+
             })}
 
         </div>
+
       )}
 
 
@@ -637,6 +948,7 @@ function StudentDashboard() {
       {/* ================================================== */}
 
       {selectedLesson && (
+
         <div style={styles.viewerOverlay}>
 
           <div style={styles.viewer}>
@@ -660,6 +972,7 @@ function StudentDashboard() {
                 onClick={() =>
                   setSelectedLesson(null)
                 }
+
                 style={styles.closeButton}
               >
                 ✕
@@ -714,13 +1027,12 @@ function StudentDashboard() {
           </div>
 
         </div>
+
       )}
 
     </div>
   );
 }
-
-
 // ============================================================
 // STYLES
 // ============================================================
@@ -784,6 +1096,14 @@ const styles = {
     whiteSpace:
       "nowrap",
   },
+onlineBadge: {
+  padding: "12px 16px",
+  borderRadius: "20px",
+  background: "#dcfce7",
+  color: "#15803d",
+  fontWeight: "bold",
+  whiteSpace: "nowrap",
+},
 
 
   message: {
