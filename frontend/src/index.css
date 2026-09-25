@@ -608,3 +608,42 @@ body {
     padding: 9px 4px !important;
   }
 }
+/* ============================================================
+   STUDENT LESSONS - MOBILE
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+  .student-lesson-grid {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+
+    gap: 16px !important;
+  }
+
+  .student-lesson-grid > div {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+
+    padding: 18px !important;
+    box-sizing: border-box !important;
+  }
+
+  .student-lesson-grid p,
+  .student-lesson-grid h3 {
+    max-width: 100% !important;
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+
+  .student-lesson-grid .translationBox {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}

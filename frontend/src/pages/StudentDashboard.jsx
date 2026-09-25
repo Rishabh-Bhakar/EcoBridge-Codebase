@@ -721,7 +721,10 @@ function StudentDashboard() {
 
       ) : (
 
-        <div style={styles.grid}>
+       <div
+  className="student-lesson-grid"
+  style={styles.grid}
+>
 
           {publishedLessons
             .slice()
@@ -1281,13 +1284,13 @@ onlineBadge: {
   },
 
 
-  translation: {
-    marginBottom: 0,
-    fontSize: "21px",
-    lineHeight: "1.8",
-    wordBreak: "break-word",
-  },
-
+ translation: {
+  marginBottom: 0,
+  fontSize: "21px",
+  lineHeight: "1.8",
+  overflowWrap: "break-word",
+  wordBreak: "normal",
+},
 
   actions: {
     display: "flex",
