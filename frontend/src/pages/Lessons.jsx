@@ -75,64 +75,35 @@ function Lessons() {
 
 useEffect(() => {
   async function loadLessons() {
-    const token = localStorage.getItem(
-      "echobridge_access_token"
-    );
-
-    if (!token) {
-      return;
-    }
-
     try {
-      const response = await fetch(
-        "http://localhost:8000/api/lessons",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const data = await getLessons();
 
-      if (!response.ok) {
-        throw new Error(
-          "Could not load lessons."
-        );
-      }
+      console.log("LESSONS FROM API:", data);
 
-      const data = await response.json();
+      const formattedLessons = (data.lessons || []).map((lesson) => ({
+        id: lesson.id,
+        type: lesson.type,
+        sourceLanguage: lesson.source_language,
+        input: lesson.input,
+        translation: lesson.translation,
+        targetLanguage: lesson.target_language,
+        targetScript: lesson.target_script,
+        createdAt: lesson.created_at,
+        published: lesson.published,
+      }));
 
-      const formattedLessons =
-        data.lessons.map((lesson) => ({
-          id: lesson.id,
-          type: lesson.type,
-          sourceLanguage:
-            lesson.source_language,
-          input: lesson.input,
-          translation:
-            lesson.translation,
-          targetLanguage:
-            lesson.target_language,
-          targetScript:
-            lesson.target_script,
-          createdAt:
-            lesson.created_at,
-          published:
-            lesson.published,
-        }));
+      console.log("FORMATTED LESSONS:", formattedLessons);
 
       setLessons(formattedLessons);
-
     } catch (error) {
-      console.warn(
-        "Could not load lessons from server. Using offline cache.",
-        error
-      );
+      console.error("Could not load lessons:", error);
+      setLessons([]);
+      setMessage(error.message || "Could not load lessons.");
     }
   }
 
   loadLessons();
 }, []);
-
   // ==========================================================
   // MESSAGE
   // ==========================================================
@@ -237,7 +208,7 @@ useEffect(() => {
 
  const deleteLesson = async (id) => {
   try {
-    await deleteLesson(id);
+    await deleteLessonFromApi(id);
 
     setLessons((currentLessons) =>
       currentLessons.filter(
