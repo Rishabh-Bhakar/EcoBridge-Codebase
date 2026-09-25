@@ -1,9 +1,57 @@
 import { useState } from "react";
-import { translatePdf } from "../services/api";
+import {
+  translatePdf,
+  createLesson,
+  publishLesson,
+} from "../services/api";
+function openPdfDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("EchoBridgePDFDatabase", 1);
 
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains("pdfs")) {
+        db.createObjectStore("pdfs");
+      }
+    };
+
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+
+    request.onerror = () => {
+      reject(request.error);
+    };
+  });
+}
+
+async function savePdfOffline(id, blob) {
+  const db = await openPdfDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("pdfs", "readwrite");
+
+    transaction.objectStore("pdfs").put(
+      blob,
+      String(id)
+    );
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
 function PdfPublisher() {
   const [file, setFile] = useState(null);
   const [pdfUrl, setPdfUrl] = useState("");
+  const [pdfBlob, setPdfBlob] = useState(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [published, setPublished] = useState(false);
@@ -21,10 +69,11 @@ function PdfPublisher() {
       return;
     }
 
-    setFile(selectedFile);
-    setPdfUrl("");
-    setPublished(false);
-    setStatus("");
+setFile(selectedFile);
+setPdfUrl("");
+setPdfBlob(null);
+setPublished(false);
+setStatus("");
   };
 
   const handleTranslate = async () => {
@@ -42,12 +91,13 @@ function PdfPublisher() {
         setPdfUrl("");
       }
 
-      const blob = await translatePdf(file);
+     const blob = await translatePdf(file);
 
-      const url = URL.createObjectURL(blob);
+setPdfBlob(blob);
 
-      setPdfUrl(url);
-      setStatus(
+const url = URL.createObjectURL(blob);
+
+setPdfUrl(url);      setStatus(
         "Translation completed successfully. Review the Santali PDF below."
       );
     } catch (error) {
@@ -73,19 +123,57 @@ function PdfPublisher() {
     document.body.removeChild(link);
   };
 
-  const handlePublish = () => {
-    if (!pdfUrl) {
-      setStatus("Translate the PDF before publishing.");
-      return;
+const handlePublish = async () => {
+  if (!pdfBlob) {
+    setStatus("Translate the PDF before publishing.");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    setStatus("Publishing lesson...");
+
+    // 1. Create lesson in PostgreSQL
+    const result = await createLesson({
+      type: "pdf",
+      source_language: "English",
+      input: file?.name || "English Lesson PDF",
+      translation: "Santali PDF lesson",
+      target_language: "Santali",
+      target_script: "Ol Chiki",
+      published: false,
+    });
+
+    const lessonId = result.lesson?.id;
+
+    if (!lessonId) {
+      throw new Error("Server did not return a lesson ID.");
     }
+
+    // 2. Store actual PDF using the PostgreSQL lesson ID
+    await savePdfOffline(lessonId, pdfBlob);
+
+    // 3. Publish the lesson
+    await publishLesson(lessonId);
 
     setPublished(true);
 
     setStatus(
-      "Lesson published successfully. Students can access the published lesson."
+      "Lesson published successfully. Students can now access it."
     );
-  };
 
+    console.log("Published PDF lesson:", lessonId);
+
+  } catch (error) {
+    console.error("Publish PDF error:", error);
+
+    setStatus(
+      error.message || "Could not publish the PDF lesson."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div style={styles.page}>
       <div style={styles.container}>
