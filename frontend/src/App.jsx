@@ -139,12 +139,13 @@ const [user, setUser] = useState(initialUser);
   return (
     <div className="app-shell">
 
-      <nav style={styles.navbar}>
+     <nav className="main-navbar" style={styles.navbar}>
 
         {/* Logo */}
 
         <div
-          style={styles.logo}
+  className="navbar-logo"
+  style={styles.logo}
          onClick={() => {
   localStorage.removeItem(
     "echobridge_access_token"
@@ -166,7 +167,7 @@ const [user, setUser] = useState(initialUser);
 
         {/* User information */}
 
-        <div style={styles.userArea}>
+       <div className="navbar-user-area" style={styles.userArea}>
 
           <div style={styles.userInfo}>
             <span style={styles.userIcon}>
@@ -208,7 +209,7 @@ const [user, setUser] = useState(initialUser);
       ------------------------------------------------ */}
 
       {user?.role === "teacher" && (
-        <div style={styles.subNav}>
+        <div className="responsive-subnav" style={styles.subNav}>
 
           <button
             onClick={() => setPage("dashboard")}
@@ -264,7 +265,7 @@ const [user, setUser] = useState(initialUser);
       ------------------------------------------------ */}
 
       {user?.role === "student" && (
-        <div style={styles.subNav}>
+        <div className="responsive-subnav" style={styles.subNav}>
 
           <button
             onClick={() => setPage("student")}

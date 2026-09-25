@@ -520,3 +520,91 @@ body {
   cursor: not-allowed;
   transform: none;
 }
+/* ============================================================
+   ECHOBRIDGE MOBILE NAVIGATION
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+  .main-navbar {
+    min-height: auto !important;
+    padding: 12px 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: center !important;
+    gap: 12px !important;
+  }
+
+  .navbar-logo {
+    justify-content: center !important;
+    font-size: 21px !important;
+  }
+
+  .navbar-logo > span {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .navbar-user-area {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
+  .responsive-subnav {
+    min-height: auto !important;
+    padding: 10px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    justify-content: stretch !important;
+  }
+
+  .responsive-subnav button {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 10px 6px !important;
+    font-size: 12px !important;
+    white-space: normal !important;
+    line-height: 1.25 !important;
+  }
+
+  main {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+}
+
+
+/* ============================================================
+   SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 380px) {
+
+  .main-navbar {
+    padding: 10px !important;
+  }
+
+  .navbar-logo {
+    font-size: 19px !important;
+  }
+
+  .navbar-user-area {
+    gap: 6px !important;
+  }
+
+  .responsive-subnav {
+    padding: 8px !important;
+    gap: 6px !important;
+  }
+
+  .responsive-subnav button {
+    font-size: 11px !important;
+    padding: 9px 4px !important;
+  }
+}
