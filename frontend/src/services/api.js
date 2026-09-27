@@ -1,5 +1,5 @@
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const AI_API_URL = import.meta.env.VITE_AI_API_URL || API_URL;
 
 
 // ============================================================
@@ -26,7 +26,7 @@ export async function translateText(
   sourceLanguage = "hindi"
 ) {
   const response = await fetch(
-    `${API_URL}/api/translate`,
+    `${AI_API_URL}/api/translate`,
     {
       method: "POST",
 
@@ -75,7 +75,7 @@ export async function speechToText(
 
 
   const response = await fetch(
-    `${API_URL}/api/speech-to-text?source_language=${encodeURIComponent(
+    `${AI_API_URL}/api/speech-to-text?source_language=${encodeURIComponent(
       sourceLanguage
     )}`,
     {
@@ -108,7 +108,7 @@ export async function textToSpeech(
   text
 ) {
   const response = await fetch(
-    `${API_URL}/api/text-to-speech`,
+    `${AI_API_URL}/api/text-to-speech`,
     {
       method: "POST",
 
@@ -147,7 +147,7 @@ export async function translatePdf(file) {
   formData.append("file", file);
 
   const response = await fetch(
-    `${API_URL}/api/translate-pdf`,
+    `${AI_API_URL}/api/translate-pdf`,
     {
       method: "POST",
       body: formData,
