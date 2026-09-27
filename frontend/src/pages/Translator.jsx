@@ -5,6 +5,7 @@ import {
   speechToText,
   translatePdf,
   createLesson,
+  uploadLessonPdf,
 } from "../services/api";
 
 
@@ -677,34 +678,49 @@ async function saveLesson() {
       // Unique lesson ID
       // ------------------------------------------------------
 
-      const lessonId =
-        Date.now();
+      
 
 
-      // ------------------------------------------------------
-      // Save actual PDF offline
-      // ------------------------------------------------------
+     // ------------------------------------------------------
+// Save lesson metadata to PostgreSQL
+// ------------------------------------------------------
 
-      await savePdfOffline(
-        lessonId,
-        blob
-      );
+const result = await createLesson({
+  type: "pdf",
+  source_language: "English",
+  input: pdfFileName,
+  translation: "Santali PDF lesson",
+  target_language: "Santali",
+  target_script: "Ol Chiki",
+  published: true,
+});
 
 
-      // ------------------------------------------------------
-      // Save lesson metadata to PostgreSQL
-      // ------------------------------------------------------
+// ------------------------------------------------------
+// Get real PostgreSQL lesson ID
+// ------------------------------------------------------
 
-      await createLesson({
-        type: "pdf",
-        source_language: "English",
-        input: pdfFileName,
-        translation: "Santali PDF lesson",
-        target_language: "Santali",
-        target_script: "Ol Chiki",
-        published: true,
-      });
+const lessonId = result.lesson.id;
 
+
+// ------------------------------------------------------
+// Upload PDF to EC2
+// ------------------------------------------------------
+
+await uploadLessonPdf(
+  lessonId,
+  blob
+);
+
+
+// ------------------------------------------------------
+// Save actual PDF offline
+// ------------------------------------------------------
+
+await savePdfOffline(
+  lessonId,
+  blob
+);
 
       setPdfPublished(true);
 

@@ -337,3 +337,60 @@ export async function deleteLesson(lessonId) {
 
   return data;
 }
+// ============================================================
+// PDF LESSON FILES
+// ============================================================
+
+export async function uploadLessonPdf(lessonId, pdfBlob) {
+  const formData = new FormData();
+
+  formData.append(
+    "file",
+    pdfBlob,
+    `lesson-${lessonId}.pdf`
+  );
+
+  const response = await fetch(
+    `${API_URL}/api/lessons/${lessonId}/pdf`,
+    {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+      },
+      body: formData,
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.detail || "Failed to upload PDF."
+    );
+  }
+
+  return data;
+}
+
+
+export async function downloadLessonPdf(lessonId) {
+  const response = await fetch(
+    `${API_URL}/api/lessons/${lessonId}/pdf`,
+    {
+      method: "GET",
+      headers: {
+        ...getAuthHeaders(),
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+
+    throw new Error(
+      data.detail || "Failed to download PDF."
+    );
+  }
+
+  return response.blob();
+}
