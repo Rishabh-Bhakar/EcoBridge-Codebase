@@ -439,7 +439,7 @@ function StudentDashboard() {
       );
 
       setMessage(
-        "Could not save lesson offline."
+        `Download failed: ${err.message}`
       );
 
     }
