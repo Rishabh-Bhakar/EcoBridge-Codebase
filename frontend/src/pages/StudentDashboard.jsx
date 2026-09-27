@@ -491,11 +491,7 @@ function StudentDashboard() {
         URL.createObjectURL(blob);
 
 
-      window.open(
-        url,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      window.location.href = url;
 
 
       setTimeout(() => {
