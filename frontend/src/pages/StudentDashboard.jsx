@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { getLessons } from "../services/api";
+import {
+  getLessons,
+  downloadLessonPdf,
+} from "../services/api";
 
 // ============================================================
 // PDF INDEXEDDB
@@ -391,21 +394,16 @@ function StudentDashboard() {
 
       if (lesson.type === "pdf") {
 
-        const pdfBlob =
-          await getPdfOffline(
-            lesson.id
-          );
+  const pdfBlob =
+    await downloadLessonPdf(
+      lesson.id
+    );
 
-        if (!pdfBlob) {
-
-          setMessage(
-            "PDF is not available in offline storage."
-          );
-
-          return;
-        }
-
-      }
+  await savePdfOffline(
+    lesson.id,
+    pdfBlob
+  );
+}
 
 
       // --------------------------------------------------------
